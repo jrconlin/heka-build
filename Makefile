@@ -2,10 +2,12 @@ APPNAME = hekad
 DEPS =
 HERE = $(shell pwd)
 BIN = $(HERE)/bin
-GOBIN = $(HERE)/bin/go
+GOBIN = $(HERE)/bin
 HGBIN = $(HERE)/pythonVE/bin/hg
-GOCMD = GOPATH=$(HERE) $(GOBIN)
-GOPATH = $GOPATH:$(HERE)
+## set the local GOROOT in case user has already installed go
+GOCMD = GOROOT=$(HERE)/build/go GOPATH=$(HERE) $(GOBIN)/go
+##gmake doesn't let you easily see environment variables.
+EGOPATH = $(HERE):$(shell echo $$GOPATH)
 
 ifeq ($(MAKECMDGOALS),test-bench)
 	BENCH = -bench .
@@ -62,10 +64,11 @@ build/go:
 	cd build && \
 		$(HGBIN) clone -u e570c2daeaca https://code.google.com/p/go
 
-$(GOBIN): build/go
+$(GOBIN)/go: build/go
 	cd build/go/src && \
 	PATH="$(BIN):$(HERE)/pythonVE/bin:$(PATH)" ./all.bash
-	cp build/go/bin/go $(HERE)/bin/go
+	# go executable is automatically copied to $(GOBIN)
+	#cp build/go/bin/go $(HERE)/bin/go
 
 sandbox: heka-source
 	mkdir -p release
@@ -80,8 +83,8 @@ src/github.com/mozilla-services/heka/README.md:
 
 heka-source: src/github.com/mozilla-services/heka/README.md
 
-bin/hekad: pluginloader heka-source $(HERE)/pythonVE $(GOBIN)
-	GOPATH=$GOPATH PATH="$(HERE)/pythonVE/bin:$(PATH)" python scripts/update_deps.py package_deps.txt
+bin/hekad: pluginloader heka-source $(HERE)/pythonVE $(GOBIN)/go
+	GOPATH=$(EGOPATH) PATH="$(HERE)/pythonVE/bin:$(PATH)" python scripts/update_deps.py package_deps.txt
 	@cd src && \
 		$(GOCMD) install github.com/mozilla-services/heka/cmd/hekad
 
@@ -114,7 +117,7 @@ src/github.com/crankycoder/g2s:
 
 g2s: src/github.com/crankycoder/g2s
 
-moz-plugins: $(GOBIN) g2s moz-plugins-source
+moz-plugins: $(GOBIN)/go g2s moz-plugins-source
 	./scripts/register_mozsvc_plugins.py
 
 build: hekad
